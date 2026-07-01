@@ -2,3 +2,9 @@
 .vscode/
 *.swp
 *.swo
+
+# Never commit credentials
+secrets.h
+credentials.h
+*.env
+
