@@ -3,6 +3,8 @@
 #include "infrastructure/display/Nokia5110Display.h"
 #include "infrastructure/sensors/Ina219Sensor.h"
 #include "infrastructure/storage/PreferencesRepository.h"
+#include "infrastructure/storage/LittleFsRepository.h"
+#include "infrastructure/storage/HistoryRepository.h"
 #include "application/MonitorApplication.h"
 #include "domain/services/EnergyCalculator.h"
 #include "domain/services/BatteryEstimator.h"
@@ -21,10 +23,6 @@ static constexpr uint8_t PIN_BTN_ADC =  7;
 struct NullRpmSensor : public IRpmSensor {
     Rpm read() override { return Rpm{}; }
 };
-struct NullStorage : public IStorage {
-    void save(const EnergyStatistics&) override {}
-    EnergyStatistics load() override { return EnergyStatistics{}; }
-};
 struct NullMqtt : public IMqttClient {
     void publish(const AppState&) override {}
 };
@@ -34,7 +32,8 @@ static Ina219Sensor* inaSensor = nullptr;
 static Nokia5110Display display(PIN_LCD_CLK, PIN_LCD_DIN, PIN_LCD_DC,
                                 PIN_LCD_CE, PIN_LCD_RST, PIN_BTN_ADC);
 static NullRpmSensor nullRpm;
-static NullStorage nullStorage;
+static LittleFsRepository lfsStorage;
+static HistoryRepository historyRepo;
 static NullMqtt nullMqtt;
 static EnergyCalculator energyCalc;
 static BatteryEstimator batteryEst;
@@ -56,7 +55,9 @@ void setup() {
     }
 
     display.begin();
-    app = new MonitorApplication(*inaSensor, nullRpm, display, nullStorage, nullMqtt,
+    lfsStorage.begin();
+    historyRepo.begin();
+    app = new MonitorApplication(*inaSensor, nullRpm, display, lfsStorage, nullMqtt,
                                  energyCalc, batteryEst,
                                  [&]() { return display.buttonPressed(); });
     app->begin();
