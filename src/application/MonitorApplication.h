@@ -20,6 +20,7 @@ public:
     void begin();
     void tick();
     const AppState& state() const { return state_; }
+    AppState getState() const { return state_; }
 
 private:
     IEnergySensor& energySensor_;

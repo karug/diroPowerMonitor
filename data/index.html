@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wind Energy Monitor</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: sans-serif; background: #1a1a2e; color: #eee; padding: 16px; }
+h1 { text-align: center; color: #4fc3f7; margin-bottom: 16px; font-size: 1.2rem; }
+.grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+.card { background: #16213e; border-radius: 8px; padding: 14px; text-align: center; }
+.card .val { font-size: 1.6rem; font-weight: bold; color: #4fc3f7; }
+.card .lbl { font-size: 0.75rem; color: #aaa; margin-top: 4px; }
+.wide { grid-column: 1 / -1; }
+canvas { width: 100%; height: 120px; background: #0f3460; border-radius: 6px; }
+.status { text-align: center; font-size: 0.75rem; color: #aaa; margin-top: 8px; }
+details { background: #16213e; border-radius: 8px; padding: 12px; margin-top: 12px; }
+summary { cursor: pointer; color: #4fc3f7; font-size: 0.9rem; }
+form { display: grid; gap: 8px; margin-top: 10px; }
+label { font-size: 0.8rem; color: #ccc; }
+input { width: 100%; padding: 6px; border-radius: 4px; border: 1px solid #333;
+        background: #0f3460; color: #eee; }
+button { padding: 8px 16px; background: #4fc3f7; color: #000; border: none;
+         border-radius: 4px; cursor: pointer; font-weight: bold; }
+#msg { font-size: 0.8rem; color: #81c784; min-height: 1.2em; }
+</style>
+</head>
+<body>
+<h1>&#127813; Wind Energy Monitor</h1>
+<div class="grid">
+  <div class="card"><div class="val" id="v">--</div><div class="lbl">Voltaje (V)</div></div>
+  <div class="card"><div class="val" id="i">--</div><div class="lbl">Corriente (A)</div></div>
+  <div class="card"><div class="val" id="p">--</div><div class="lbl">Potencia (W)</div></div>
+  <div class="card wide">
+    <canvas id="chart"></canvas>
+  </div>
+  <div class="card"><div class="val" id="wt">--</div><div class="lbl">Hoy (Wh)</div></div>
+  <div class="card"><div class="val" id="wk">--</div><div class="lbl">Total (kWh)</div></div>
+  <div class="card"><div class="val" id="rpm">--</div><div class="lbl">RPM</div></div>
+  <div class="card"><div class="val" id="bat">--</div><div class="lbl">Bateria (%)</div></div>
+  <div class="card"><div class="val" id="chg">--</div><div class="lbl">Estado</div></div>
+</div>
+<div class="status" id="ts">Actualizando...</div>
+
+<details>
+<summary>&#9881; Configuracion</summary>
+<form id="cfg">
+  <label>MQTT Host <input id="mqtt_host" placeholder="192.168.1.x"></label>
+  <label>MQTT Port <input id="mqtt_port" type="number" value="1883"></label>
+  <label>Pulsos/rev <input id="pulses_rev" type="number" value="1" min="1"></label>
+  <label>Shunt (Ohm) <input id="shunt_ohm" type="number" step="0.001" value="0.1"></label>
+  <button type="submit">Guardar</button>
+  <div id="msg"></div>
+</form>
+</details>
+
+<script>
+var powerHistory = [];
+var MAX_PTS = 60;
+
+function drawChart() {
+  var c = document.getElementById('chart');
+  var ctx = c.getContext('2d');
+  c.width = c.offsetWidth || 300;
+  c.height = 120;
+  ctx.clearRect(0, 0, c.width, c.height);
+  if (powerHistory.length < 2) return;
+  var max = Math.max.apply(null, powerHistory.concat([1]));
+  var w = c.width, h = c.height;
+  ctx.beginPath();
+  ctx.strokeStyle = '#4fc3f7';
+  ctx.lineWidth = 2;
+  powerHistory.forEach(function(v, i) {
+    var x = (i / (MAX_PTS - 1)) * w;
+    var y = h - (v / max) * (h - 10) - 2;
+    if (i === 0) { ctx.moveTo(x, y); } else { ctx.lineTo(x, y); }
+  });
+  ctx.stroke();
+}
+
+function update() {
+  fetch('/api/status')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      document.getElementById('v').textContent   = d.voltage.toFixed(1);
+      document.getElementById('i').textContent   = d.current.toFixed(2);
+      document.getElementById('p').textContent   = d.power.toFixed(1);
+      document.getElementById('wt').textContent  = d.whToday.toFixed(1);
+      document.getElementById('wk').textContent  = (d.whTotal / 1000).toFixed(2);
+      document.getElementById('rpm').textContent = d.rpm;
+      document.getElementById('bat').textContent = d.batPct;
+      document.getElementById('chg').textContent = d.charging ? 'CHG' : 'OK';
+      document.getElementById('ts').textContent  = 'Actualizado: ' + new Date().toLocaleTimeString();
+      powerHistory.push(d.power);
+      if (powerHistory.length > MAX_PTS) powerHistory.shift();
+      drawChart();
+    })
+    .catch(function() {
+      document.getElementById('ts').textContent = 'Sin conexion';
+    });
+}
+
+document.getElementById('cfg').addEventListener('submit', function(e) {
+  e.preventDefault();
+  var body = {
+    mqtt_host:  document.getElementById('mqtt_host').value,
+    mqtt_port:  parseInt(document.getElementById('mqtt_port').value),
+    pulses_rev: parseInt(document.getElementById('pulses_rev').value),
+    shunt_ohm:  parseFloat(document.getElementById('shunt_ohm').value)
+  };
+  fetch('/api/config', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body)
+  }).then(function(r) {
+    document.getElementById('msg').textContent = r.ok ? 'Guardado' : 'Error';
+    setTimeout(function() { document.getElementById('msg').textContent = ''; }, 3000);
+  });
+});
+
+update();
+setInterval(update, 2000);
+</script>
+</body>
+</html>

@@ -6,6 +6,8 @@
 #include "infrastructure/storage/PreferencesRepository.h"
 #include "infrastructure/storage/LittleFsRepository.h"
 #include "infrastructure/storage/HistoryRepository.h"
+#include "infrastructure/network/WifiNtpManager.h"
+#include "infrastructure/network/WebApiHandler.h"
 #include "application/MonitorApplication.h"
 #include "domain/services/EnergyCalculator.h"
 #include "domain/services/BatteryEstimator.h"
@@ -37,6 +39,8 @@ static NullMqtt nullMqtt;
 static EnergyCalculator energyCalc;
 static BatteryEstimator batteryEst;
 
+static WifiNtpManager wifiMgr;
+static WebApiHandler* webApi = nullptr;
 static MonitorApplication* app = nullptr;
 static uint32_t lastTickMs = 0;
 
@@ -59,6 +63,16 @@ void setup() {
     display.begin();
     lfsStorage.begin();
     historyRepo.begin();
+
+    // WiFi provisioning via captive portal (credentials stored in NVS by WiFiManager)
+    wifiMgr.begin([&]() { LOG_INFO("WiFi connected"); });
+
+    // Web API — only start server if WiFi is up
+    webApi = new WebApiHandler(
+        [&]() { return app ? app->getState() : AppState{}; },
+        historyRepo, config);
+    if (wifiMgr.isConnected()) webApi->begin();
+
     app = new MonitorApplication(*inaSensor, *hallSensor, display, lfsStorage, nullMqtt,
                                  energyCalc, batteryEst,
                                  [&]() { return display.buttonPressed(); });
@@ -66,6 +80,7 @@ void setup() {
 }
 
 void loop() {
+    wifiMgr.process();
     uint32_t now = millis();
     if (now - lastTickMs >= 1000) {
         lastTickMs = now;
