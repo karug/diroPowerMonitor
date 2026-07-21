@@ -2,6 +2,7 @@
 #include "Logger.h"
 #include "infrastructure/display/Nokia5110Display.h"
 #include "infrastructure/sensors/Ina219Sensor.h"
+#include "infrastructure/sensors/HallSensor.h"
 #include "infrastructure/storage/PreferencesRepository.h"
 #include "infrastructure/storage/LittleFsRepository.h"
 #include "infrastructure/storage/HistoryRepository.h"
@@ -19,19 +20,17 @@ static constexpr uint8_t PIN_LCD_DC  =  9;
 static constexpr uint8_t PIN_LCD_CE  = 10;
 static constexpr uint8_t PIN_LCD_RST = 14;
 static constexpr uint8_t PIN_BTN_ADC =  7;
+static constexpr uint8_t PIN_HALL    =  6;
 
-struct NullRpmSensor : public IRpmSensor {
-    Rpm read() override { return Rpm{}; }
-};
 struct NullMqtt : public IMqttClient {
     void publish(const AppState&) override {}
 };
 
 static PreferencesRepository config;
 static Ina219Sensor* inaSensor = nullptr;
+static HallSensor* hallSensor = nullptr;
 static Nokia5110Display display(PIN_LCD_CLK, PIN_LCD_DIN, PIN_LCD_DC,
                                 PIN_LCD_CE, PIN_LCD_RST, PIN_BTN_ADC);
-static NullRpmSensor nullRpm;
 static LittleFsRepository lfsStorage;
 static HistoryRepository historyRepo;
 static NullMqtt nullMqtt;
@@ -54,10 +53,13 @@ void setup() {
         LOG_INFO("INA219 not found, using shunt=0.1");
     }
 
+    hallSensor = new HallSensor(PIN_HALL, cfg.pulsesPerRev);
+    hallSensor->begin();
+
     display.begin();
     lfsStorage.begin();
     historyRepo.begin();
-    app = new MonitorApplication(*inaSensor, nullRpm, display, lfsStorage, nullMqtt,
+    app = new MonitorApplication(*inaSensor, *hallSensor, display, lfsStorage, nullMqtt,
                                  energyCalc, batteryEst,
                                  [&]() { return display.buttonPressed(); });
     app->begin();
