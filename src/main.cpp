@@ -1,10 +1,17 @@
 #include <Arduino.h>
 #include "Logger.h"
+#include "infrastructure/display/Nokia5110Display.h"
 #include "application/MonitorApplication.h"
 #include "domain/services/EnergyCalculator.h"
 #include "domain/services/BatteryEstimator.h"
 
-// Null stubs — replaced by real implementations in Tasks 5-11
+static constexpr uint8_t PIN_LCD_CLK = 12;
+static constexpr uint8_t PIN_LCD_DIN = 11;
+static constexpr uint8_t PIN_LCD_DC = 9;
+static constexpr uint8_t PIN_LCD_CE = 10;
+static constexpr uint8_t PIN_LCD_RST = 14;
+static constexpr uint8_t PIN_BTN_ADC = 7;  // Keyes AD Key OUT pin
+
 struct NullSensor : public IEnergySensor {
     Measurement read() override {
         Measurement m;
@@ -19,20 +26,18 @@ struct NullRpmSensor : public IRpmSensor {
 };
 struct NullStorage : public IStorage {
     void save(const EnergyStatistics&) override {}
-    EnergyStatistics load() override { return {}; }
+    EnergyStatistics load() override { return EnergyStatistics{}; }
 };
 struct NullMqtt : public IMqttClient {
     void publish(const AppState&) override {}
-};
-struct NullDisplay : public IDisplay {
-    void show(Page, const AppState&) override {}
 };
 
 static NullSensor nullSensor;
 static NullRpmSensor nullRpm;
 static NullStorage nullStorage;
 static NullMqtt nullMqtt;
-static NullDisplay nullDisplay;
+static Nokia5110Display display(PIN_LCD_CLK, PIN_LCD_DIN, PIN_LCD_DC, PIN_LCD_CE,
+                                PIN_LCD_RST, PIN_BTN_ADC);
 static EnergyCalculator energyCalc;
 static BatteryEstimator batteryEst;
 
@@ -42,9 +47,11 @@ static uint32_t lastTickMs = 0;
 void setup() {
     Serial.begin(115200);
     delay(500);
-    LOG_INFO("Wind Energy Monitor v0.1");
-    app = new MonitorApplication(nullSensor, nullRpm, nullDisplay, nullStorage, nullMqtt,
-                                 energyCalc, batteryEst);
+    LOG_INFO("Wind Energy Monitor v0.2");
+    display.begin();
+    app = new MonitorApplication(nullSensor, nullRpm, display, nullStorage, nullMqtt,
+                                 energyCalc, batteryEst,
+                                 [&]() { return display.buttonPressed(); });
     app->begin();
 }
 
