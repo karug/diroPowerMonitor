@@ -3,7 +3,6 @@
 #include "application/MonitorApplication.h"
 #include "domain/services/EnergyCalculator.h"
 #include "domain/services/BatteryEstimator.h"
-#include "domain/services/RpmCalculator.h"
 
 // Null stubs — replaced by real implementations in Tasks 5-11
 struct NullSensor : public IEnergySensor {
@@ -36,7 +35,6 @@ static NullMqtt nullMqtt;
 static NullDisplay nullDisplay;
 static EnergyCalculator energyCalc;
 static BatteryEstimator batteryEst;
-static RpmCalculator rpmCalc(1);
 
 static MonitorApplication* app = nullptr;
 static uint32_t lastTickMs = 0;
@@ -46,7 +44,7 @@ void setup() {
     delay(500);
     LOG_INFO("Wind Energy Monitor v0.1");
     app = new MonitorApplication(nullSensor, nullRpm, nullDisplay, nullStorage, nullMqtt,
-                                 energyCalc, batteryEst, rpmCalc);
+                                 energyCalc, batteryEst);
     app->begin();
 }
 

@@ -6,16 +6,16 @@ MonitorApplication::MonitorApplication(
     IEnergySensor& energySensor, IRpmSensor& rpmSensor,
     IDisplay& display, IStorage& storage, IMqttClient& mqtt,
     EnergyCalculator& energyCalc, BatteryEstimator& batteryEst,
-    RpmCalculator& rpmCalc, std::function<bool()> pageButtonFn,
-    std::function<uint8_t()> currentDayFn)
+    std::function<bool()> pageButtonFn, std::function<uint8_t()> currentDayFn)
     : energySensor_(energySensor), rpmSensor_(rpmSensor),
       display_(display), storage_(storage), mqtt_(mqtt),
-      energyCalc_(energyCalc), batteryEst_(batteryEst), rpmCalc_(rpmCalc),
+      energyCalc_(energyCalc), batteryEst_(batteryEst),
       pageButtonFn_(pageButtonFn), currentDayFn_(currentDayFn) {}
 
 void MonitorApplication::begin() {
     state_.energy = storage_.load();
     if (currentDayFn_) lastDay_ = currentDayFn_();
+    lastPersistMs_ = millis();
     LOG_INFO("MonitorApplication started");
 }
 
@@ -53,7 +53,7 @@ void MonitorApplication::tick() {
     mqtt_.publish(state_);
 
     // Persist every 10 minutes
-    if (lastPersistMs_ == 0 || now - lastPersistMs_ >= 600000UL) {
+    if (now - lastPersistMs_ >= 600000UL) {
         storage_.save(state_.energy);
         lastPersistMs_ = now;
     }
