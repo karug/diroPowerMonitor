@@ -9,12 +9,12 @@
 #include "infrastructure/network/WifiNtpManager.h"
 #include "infrastructure/network/OtaManager.h"
 #include "infrastructure/network/WebApiHandler.h"
+#include "infrastructure/network/MqttClient.h"
 #include "application/MonitorApplication.h"
 #include "domain/services/EnergyCalculator.h"
 #include "domain/services/BatteryEstimator.h"
 #include "domain/ports/IRpmSensor.h"
 #include "domain/ports/IStorage.h"
-#include "domain/ports/IMqttClient.h"
 #include "domain/entities/EnergyStatistics.h"
 
 static constexpr uint8_t PIN_LCD_CLK = 12;
@@ -25,10 +25,6 @@ static constexpr uint8_t PIN_LCD_RST = 14;
 static constexpr uint8_t PIN_BTN_ADC =  7;
 static constexpr uint8_t PIN_HALL    =  6;
 
-struct NullMqtt : public IMqttClient {
-    void publish(const AppState&) override {}
-};
-
 static PreferencesRepository config;
 static Ina219Sensor* inaSensor = nullptr;
 static HallSensor* hallSensor = nullptr;
@@ -36,7 +32,7 @@ static Nokia5110Display display(PIN_LCD_CLK, PIN_LCD_DIN, PIN_LCD_DC,
                                 PIN_LCD_CE, PIN_LCD_RST, PIN_BTN_ADC);
 static LittleFsRepository lfsStorage;
 static HistoryRepository historyRepo;
-static NullMqtt nullMqtt;
+static MqttClient* mqttClient = nullptr;
 static EnergyCalculator energyCalc;
 static BatteryEstimator batteryEst;
 
@@ -53,6 +49,8 @@ void setup() {
 
     config.begin();
     WindConfig cfg = config.loadConfig();
+
+    mqttClient = new MqttClient(cfg.mqttHost, cfg.mqttPort);
 
     inaSensor = new Ina219Sensor(cfg.shuntOhm);
     if (!inaSensor->begin()) {
@@ -76,7 +74,7 @@ void setup() {
     if (wifiMgr.isConnected()) webApi->begin();
     if (wifiMgr.isConnected()) otaMgr.begin(cfg.otaPass);
 
-    app = new MonitorApplication(*inaSensor, *hallSensor, display, lfsStorage, nullMqtt,
+    app = new MonitorApplication(*inaSensor, *hallSensor, display, lfsStorage, *mqttClient,
                                  energyCalc, batteryEst,
                                  [&]() { return display.buttonPressed(); });
     app->begin();
