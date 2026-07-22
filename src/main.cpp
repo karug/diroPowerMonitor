@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <time.h>
 #include "Logger.h"
 #include "infrastructure/display/Nokia5110Display.h"
 #include "infrastructure/sensors/Ina219Sensor.h"
@@ -45,7 +46,7 @@ static uint32_t lastTickMs = 0;
 void setup() {
     Serial.begin(115200);
     delay(500);
-    LOG_INFO("Wind Energy Monitor v0.7");
+    LOG_INFO("Wind Energy Monitor v1.0");
 
     config.begin();
     WindConfig cfg = config.loadConfig();
@@ -76,7 +77,13 @@ void setup() {
 
     app = new MonitorApplication(*inaSensor, *hallSensor, display, lfsStorage, *mqttClient,
                                  energyCalc, batteryEst,
-                                 [&]() { return display.buttonPressed(); });
+                                 [&]() { return display.buttonPressed(); },
+                                 []() -> uint8_t {
+                                     time_t now = time(nullptr);
+                                     struct tm t;
+                                     localtime_r(&now, &t);
+                                     return static_cast<uint8_t>(t.tm_mday);
+                                 });
     app->begin();
 }
 
