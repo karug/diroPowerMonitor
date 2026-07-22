@@ -7,6 +7,7 @@
 #include "infrastructure/storage/LittleFsRepository.h"
 #include "infrastructure/storage/HistoryRepository.h"
 #include "infrastructure/network/WifiNtpManager.h"
+#include "infrastructure/network/OtaManager.h"
 #include "infrastructure/network/WebApiHandler.h"
 #include "application/MonitorApplication.h"
 #include "domain/services/EnergyCalculator.h"
@@ -40,6 +41,7 @@ static EnergyCalculator energyCalc;
 static BatteryEstimator batteryEst;
 
 static WifiNtpManager wifiMgr;
+static OtaManager otaMgr;
 static WebApiHandler* webApi = nullptr;
 static MonitorApplication* app = nullptr;
 static uint32_t lastTickMs = 0;
@@ -47,7 +49,7 @@ static uint32_t lastTickMs = 0;
 void setup() {
     Serial.begin(115200);
     delay(500);
-    LOG_INFO("Wind Energy Monitor v0.3");
+    LOG_INFO("Wind Energy Monitor v0.7");
 
     config.begin();
     WindConfig cfg = config.loadConfig();
@@ -72,6 +74,7 @@ void setup() {
         [&]() { return app ? app->getState() : AppState{}; },
         historyRepo, config);
     if (wifiMgr.isConnected()) webApi->begin();
+    if (wifiMgr.isConnected()) otaMgr.begin(cfg.otaPass);
 
     app = new MonitorApplication(*inaSensor, *hallSensor, display, lfsStorage, nullMqtt,
                                  energyCalc, batteryEst,
@@ -80,7 +83,9 @@ void setup() {
 }
 
 void loop() {
+    otaMgr.handle();
     wifiMgr.process();
+    if (webApi) webApi->handle();
     uint32_t now = millis();
     if (now - lastTickMs >= 1000) {
         lastTickMs = now;

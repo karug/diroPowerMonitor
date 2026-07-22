@@ -4,7 +4,7 @@
 #include "../storage/HistoryRepository.h"
 #include "../storage/PreferencesRepository.h"
 
-class AsyncWebServer;
+class WebServer;
 
 class WebApiHandler {
 public:
@@ -16,10 +16,11 @@ public:
     ~WebApiHandler();
 
     void begin();
+    void handle();
 
 private:
     AppStateGetter getter_;
     HistoryRepository& history_;
     PreferencesRepository& config_;
-    AsyncWebServer* server_;
+    WebServer* server_;
 };
