@@ -1,7 +1,7 @@
 #include "PreferencesRepository.h"
 #include <Preferences.h>
 
-static constexpr char kNs[] = "wind";
+static constexpr char kNs[] = "dpm";
 
 PreferencesRepository::PreferencesRepository() : prefs_(new Preferences()) {}
 PreferencesRepository::~PreferencesRepository() { delete prefs_; }

@@ -3,7 +3,7 @@
 #include <Arduino.h>
 #include <time.h>
 
-static constexpr char kApName[] = "WindMonitor-Setup";
+static constexpr char kApName[] = "diro-PowerMonitor";
 // AP password intentionally empty — open portal for provisioning only
 // No secrets hardcoded per project security policy
 
